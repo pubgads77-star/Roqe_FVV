@@ -119,32 +119,17 @@ console.log('ℹ️ No events to generate');
 
 const { error, value } = createEvents(events);
 
-if (error) {
-  console.error('❌ Error creating events:', error);
-  process.exit(1);
-}
+  if (error) {
+    console.error('❌ Error creating events:', error);
+    process.exit(1);
+  }
 
-// Build iCal manually from events
-const calendarLines = [
-  'BEGIN:VCALENDAR',
-  'PRODID:-//Roqii Apartments//Booking Sync//EN',
-  'VERSION:2.0',
-  'CALSCALE:GREGORIAN',
-  'X-WR-CALNAME:Roqii Apartments Calendar',
-  'X-WR-TIMEZONE:Asia/Riyadh'
-];
+  // value is already a complete iCal string from createEvents
+  const calendar = value;
 
-value.forEach(eventStr => {
-  calendarLines.push(eventStr);
-});
-
-calendarLines.push('END:VCALENDAR');
-
-const calendar = calendarLines.join('\r\n');
-
-fs.writeFileSync('public/calendar.ics', calendar);
-console.log(`✅ Generated calendar.ics with ${events.length} events`);
-console.log('📁 Saved to public/calendar.ics');
+  fs.writeFileSync('public/calendar.ics', calendar);
+  console.log(`✅ Generated calendar.ics with ${events.length} events`);
+  console.log('📁 Saved to public/calendar.ics');
 }
 
 generateICAL()
