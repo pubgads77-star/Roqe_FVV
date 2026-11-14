@@ -1,7 +1,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import ics from 'ics';
-const { createEvents, createCalendar } = ics;
+const { createEvents } = ics;
 import fs from 'fs';
 
 const SERVICE_ACCOUNT = JSON.parse(fs.readFileSync('serviceAccountKey.json', 'utf8'));
@@ -112,28 +112,39 @@ async function generateICAL() {
   }
   
   if (events.length === 0) {
-    console.log('ℹ️ No events to generate');
-    fs.writeFileSync('public/calendar.ics', '');
-    return;
-  }
-  
-  const { error, value } = createEvents(events);
-  
-  if (error) {
-    console.error('❌ Error creating events:', error);
-    process.exit(1);
-  }
-  
-  const calendar = createCalendar(value, {
-    prodId: '-//Roqii Apartments//Booking Sync//EN',
-    version: '2.0',
-    name: 'Roqii Apartments Calendar',
-    timezone: 'Asia/Riyadh'
-  });
-  
-  fs.writeFileSync('public/calendar.ics', calendar);
-  console.log(`✅ Generated calendar.ics with ${events.length} events`);
-  console.log('📁 Saved to public/calendar.ics');
+console.log('ℹ️ No events to generate');
+  fs.writeFileSync('public/calendar.ics', '');
+  return;
+}
+
+const { error, value } = createEvents(events);
+
+if (error) {
+  console.error('❌ Error creating events:', error);
+  process.exit(1);
+}
+
+// Build iCal manually from events
+const calendarLines = [
+  'BEGIN:VCALENDAR',
+  'PRODID:-//Roqii Apartments//Booking Sync//EN',
+  'VERSION:2.0',
+  'CALSCALE:GREGORIAN',
+  'X-WR-CALNAME:Roqii Apartments Calendar',
+  'X-WR-TIMEZONE:Asia/Riyadh'
+];
+
+value.forEach(eventStr => {
+  calendarLines.push(eventStr);
+});
+
+calendarLines.push('END:VCALENDAR');
+
+const calendar = calendarLines.join('\r\n');
+
+fs.writeFileSync('public/calendar.ics', calendar);
+console.log(`✅ Generated calendar.ics with ${events.length} events`);
+console.log('📁 Saved to public/calendar.ics');
 }
 
 generateICAL()
