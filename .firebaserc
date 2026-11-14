@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "roqi-apartments"
+  },
+  "targets": {
+    "roqi-apartments": {
+      "hosting": {
+        "iCal": [
+          "roqi-apartments"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

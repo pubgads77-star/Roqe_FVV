@@ -1,0 +1,52 @@
+﻿rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Apartments - public read for prices, admin write for price updates & initialization
+    match /apartments/{aptId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Bookings - public create (client booking), admin read/update/delete (dashboard)
+    match /bookings/{bookingId} {
+      allow create: if true;
+      allow read: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+    
+    // Blocked dates - public read for calendar, admin write
+    match /blockedDates/{aptId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Site settings - public read, admin write
+    match /settings/siteInfo {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Notifications - allow read/write for all (client reads own by clientId in query)
+    match /notifications/{notificationId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Apartment closures (admin-controlled availability) - public read for booking calendar
+    match /apartmentClosures/{closureId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Apartment price overrides by date range - public read for booking pricing
+    match /apartmentPriceOverrides/{overrideId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+  }
+}
