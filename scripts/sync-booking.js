@@ -27,6 +27,11 @@ function formatDateForFirestore(date) {
   return date.toISOString().split('T')[0];
 }
 
+function calculateNights(checkIn, checkOut) {
+  const diff = checkOut.getTime() - checkIn.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
 async function syncFromBooking() {
   console.log('📥 Fetching iCal from Booking.com...');
   
@@ -52,7 +57,7 @@ async function syncFromBooking() {
     const vevent = new ICAL.Event(event);
     
     const uid = vevent.uid;
-    const summary = vevent.summary || '';
+    const summary = vevent.summary || 'CLOSED - Not available';
     const description = vevent.description || '';
     
     const startDate = parseDate(vevent.startDate);
@@ -66,34 +71,64 @@ async function syncFromBooking() {
     
     const startStr = formatDateForFirestore(startDate.toDate());
     const endStr = formatDateForFirestore(endDate.toDate());
+    const checkInDate = startDate.toDate();
+    const checkOutDate = endDate.toDate();
+    const nights = calculateNights(checkInDate, checkOutDate);
     
-    const docId = `booking_${uid.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const docRef = db.collection('apartmentClosures').doc(docId);
+    // Use UID to create unique booking number
+    const bookingUid = uid;
+    const bookingNumber = `BK-${uid.substring(0, 8).toUpperCase()}`;
     
-    const existing = await docRef.get();
-    if (existing.exists) {
+    // Check if already exists by bookingUid
+    const existingQuery = await db.collection('bookings')
+      .where('bookingUid', '==', bookingUid)
+      .limit(1)
+      .get();
+    
+    if (!existingQuery.empty) {
       skipped++;
       continue;
     }
     
+    // Base price per night (can be dynamic later)
+    const pricePerNight = 1450;
+    const totalAmount = pricePerNight * nights;
+    
+    const docRef = db.collection('bookings').doc();
+    
     batch.set(docRef, {
+      bookingNumber,
       apartmentId: 'apt-01',
-      startDate: startStr,
-      endDate: endStr,
-      note: `Booking.com: ${summary} - ${description}`.substring(0, 500),
-      source: 'booking.com',
-      bookingUid: uid,
+      apartmentName: 'رُقِيّ',
+      guestName: 'حجز Booking.com',
+      guestIdNumber: 'غير متوفر',
+      guestPhone: 'من Booking.com',
+      guestEmail: '',
+      guestCount: 1,
+      checkInDate: startStr,
+      checkOutDate: endStr,
+      nights,
+      pricePerNight,
+      subtotal: totalAmount,
+      serviceFee: 0,
+      deposit: 0,
+      totalAmount,
+      notes: `📌 مستورد من Booking.com - راجع Extranet للتفاصيل\nUID: ${uid}`,
+      status: 'confirmed',
+      paymentStatus: 'paid',
       createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
+      updatedAt: Timestamp.now(),
+      source: 'booking.com',
+      bookingUid
     });
     added++;
   }
   
   if (added > 0) {
     await batch.commit();
-    console.log(`✅ Added ${added} new closures from Booking.com`);
+    console.log(`✅ Added ${added} new bookings from Booking.com`);
   } else {
-    console.log('ℹ️ No new closures to add');
+    console.log('ℹ️ No new bookings to add');
   }
   console.log(`⏭️ Skipped ${skipped} existing/duplicate events`);
 }
