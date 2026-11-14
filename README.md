@@ -2,7 +2,17 @@
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# روقي (Roqii) - شقق فندقية فاخرة
+
+نظام حجز وإدارة شقق فندقية متكامل مع مزامنة تقويم Booking.com التلقائية.
+
+- **الموقع المباشر**: https://roqi-apartments.web.app
+- **تقويم iCal للتصدير**: https://pubgads77-star.github.io/Roqe_FVV/calendar.ics
+- **المزامنة**: كل 15 دقيقة عبر GitHub Actions
+
+---
+
+## Run and deploy your AI Studio app
 
 This contains everything you need to run your app locally.
 
