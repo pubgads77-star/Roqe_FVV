@@ -1,8 +1,11 @@
 name: Generate iCal Feeds
 
 on:
-  schedule:
-    - cron: '0 * * * *'
+  # Disabled: this workflow deploys public/ alone to the same site as the app,
+  # which breaks the main site. Export is now handled by booking-sync.yml
+  # (builds dist with app + iCal and deploys together).
+  # schedule:
+  #   - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:

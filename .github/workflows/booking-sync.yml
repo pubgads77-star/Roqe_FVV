@@ -36,17 +36,19 @@ jobs:
           BOOKING_ICAL_URL: ${{ secrets.BOOKING_ICAL_URL }}
         run: node scripts/sync-booking.js
 
-      - name: Generate iCal Export (Firestore → .ics)
+      - name: Generate iCal Export (Firestore → public/calendar.ics)
         run: node scripts/generate-ical.js
 
-      - name: Deploy iCal to Firebase Hosting
+      - name: Build app (copies public/* into dist/)
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting (app + iCal)
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           projectId: roqi-apartments
-          target: iCal
-          entryPoint: ./public
+          channelId: live
 
       - name: Show iCal URL
         run: |
