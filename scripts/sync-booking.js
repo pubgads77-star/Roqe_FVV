@@ -105,6 +105,7 @@ async function syncFromBooking() {
       guestPhone: 'من Booking.com',
       guestEmail: '',
       guestCount: 1,
+      apartmentsCount: 1, // كل فترة مغلقة من بوكنج = وحدة واحدة محجوزة
       checkInDate: startStr,
       checkOutDate: endStr,
       nights,

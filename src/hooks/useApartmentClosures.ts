@@ -1,6 +1,21 @@
-﻿import { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+
+function generateDateRangeArray(startDate: string, endDate: string): string[] {
+  const out: string[] = [];
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  const cur = new Date(start);
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
 
 export interface ApartmentClosure {
   id: string;
@@ -21,21 +36,6 @@ interface UseApartmentClosuresResult {
 
 export function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
   return aStart <= bEnd && bStart <= aEnd;
-}
-
-export function eachDateInRange(startDate: string, endDate: string): string[] {
-  const out: string[] = [];
-  const start = new Date(startDate + 'T00:00:00');
-  const end = new Date(endDate + 'T00:00:00');
-  const cur = new Date(start);
-  while (cur <= end) {
-    const y = cur.getFullYear();
-    const m = String(cur.getMonth() + 1).padStart(2, '0');
-    const d = String(cur.getDate()).padStart(2, '0');
-    out.push(`${y}-${m}-${d}`);
-    cur.setDate(cur.getDate() + 1);
-  }
-  return out;
 }
 
 export function useApartmentClosures(apartmentId?: string | null): UseApartmentClosuresResult {

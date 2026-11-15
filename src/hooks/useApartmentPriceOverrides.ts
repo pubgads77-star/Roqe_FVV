@@ -1,7 +1,25 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { rangesOverlap, eachDateInRange } from './useApartmentClosures';
+
+function generateDateRangeArray(startDate: string, endDate: string): string[] {
+  const out: string[] = [];
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  const cur = new Date(start);
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  return aStart <= bEnd && bStart <= aEnd;
+}
 
 export interface ApartmentPriceOverride {
   id: string;
@@ -88,11 +106,11 @@ export function buildPriceMapForStay(
   const nightly: { date: string; price: number; override: boolean }[] = [];
   if (!checkIn || !checkOut) return { total: 0, nights: 0, nightly };
   // nights are [checkIn, checkOut)
-  const dates = eachDateInRange(checkIn, checkOut).slice(0, -1); // exclude checkout day
+  const dates = generateDateRangeArray(checkIn, checkOut).slice(0, -1); // exclude checkout day
   // build quick lookup: for each override range map dates; non-overlapping by design
   const byDate = new Map<string, number>();
   overrides.forEach(o => {
-    eachDateInRange(o.startDate, o.endDate).forEach(d => {
+    generateDateRangeArray(o.startDate, o.endDate).forEach(d => {
       if (!byDate.has(d)) byDate.set(d, o.pricePerNight);
     });
   });

@@ -3,7 +3,21 @@ import { Calendar, X, Eye, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Aler
 import { Booking, APARTMENTS, Apartment } from '../data/apartmentsData';
 import { db, collection, query, where, orderBy, onSnapshot } from '../lib/firebase';
 import { LoadingScreen } from './LoadingScreen';
-import { eachDateInRange } from '../hooks/useApartmentClosures';
+
+function generateDateRangeArray(startDate: string, endDate: string): string[] {
+  const out: string[] = [];
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  const cur = new Date(start);
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    out.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
 
 interface ApartmentCalendarProps {
   onBack?: () => void;
@@ -237,7 +251,7 @@ export const ApartmentCalendar: React.FC<ApartmentCalendarProps> = ({ onBack }) 
     const rowTracker: Record<string, number> = {};
 
     closures.forEach(c => {
-      const dateList = eachDateInRange(c.startDate, c.endDate);
+      const dateList = generateDateRangeArray(c.startDate, c.endDate);
       dateList.forEach(dateStr => {
         const d = new Date(dateStr + 'T00:00:00');
         if (d.getFullYear() !== year || d.getMonth() !== month) return;

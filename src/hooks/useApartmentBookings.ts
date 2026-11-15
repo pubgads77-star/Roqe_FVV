@@ -61,6 +61,7 @@ export function useApartmentBookings(apartmentId: string | null): UseApartmentBo
           createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt?.toDate?.()?.toISOString(),
           guestClientId: data.guestClientId,
+          source: data.source,
         } as Booking);
       });
       setBookings(bookingsData);

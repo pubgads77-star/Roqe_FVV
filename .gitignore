@@ -7,3 +7,11 @@ coverage/
 .env*
 !.env.example
 serviceAccountKey.json
+
+# Utility scripts with embedded secrets (kept local only)
+scripts/check-apt01-images.ts
+scripts/migrate-images.ts
+scripts/restore-apt01-images.ts
+scripts/sync-images-to-firestore.ts
+
+# Firebase deploy cache.firebase/

@@ -174,13 +174,35 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
   const { closures: apartmentClosures } = useApartmentClosures(selectedAptId);
   const { overrides: apartmentPriceOverrides } = useApartmentPriceOverrides(selectedAptId);
 
-  // Compute blocked dates from real-time bookings + admin closures
+  // Compute availability from real-time bookings + admin closures
   const { 
     isDateBlocked, 
+    isDateFullyBooked,
+    getAvailableUnits,
     getBlockedInfo, 
     isDateRangeBlocked,
-    blockedDateDetails 
-  } = useBlockedDates(apartmentBookings, apartmentClosures);
+    isDateRangeFullyBooked,
+    getRangeAvailability,
+    totalUnits,
+    availableUnitsMap
+  } = useBlockedDates(apartmentBookings, apartmentClosures, selectedApartment.totalUnits || 2);
+
+  // Keep the selected apartment count within the available units for the chosen dates.
+  // If a date is partially booked (e.g. only 1 of 2 units free), the count auto-reduces to that availability.
+  useEffect(() => {
+    if (!checkIn || !checkOut) return;
+    const availability = getRangeAvailability(checkIn, checkOut);
+    const maxAvailable = Math.min(availability.minAvailableUnits, totalUnits);
+    if (maxAvailable <= 0) {
+      setApartmentsCount(1);
+      return;
+    }
+    setApartmentsCount(prev => {
+      if (prev < 1) return 1;
+      if (prev > maxAvailable) return maxAvailable;
+      return prev;
+    });
+  }, [checkIn, checkOut, apartmentBookings, apartmentClosures, totalUnits]);
 
   // Calculate nights - date-only comparison to avoid DST/timezone issues
   const nights = useMemo(() => {
@@ -267,10 +289,10 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         message: '⚠️ تاريخ الوصول في الماضي، يُرجى تحديد تاريخ قادم.'
       };
     }
-    const blocked = isDateBlocked(checkIn);
-    if (blocked) {
-      const blockedInfo = getBlockedInfo(checkIn);
-      const isClosed = blockedInfo?.reason === 'closed';
+    const fullyBooked = getAvailableUnits(checkIn) <= 0;
+    const blockedInfo = getBlockedInfo(checkIn);
+    const isClosed = blockedInfo?.reason === 'closed';
+    if (isClosed || fullyBooked) {
       return {
         isSet: true,
         isBlocked: true,
@@ -278,16 +300,19 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         blockReason: isClosed ? 'closed' : 'booking',
         message: isClosed
           ? `⛔ مغلق! تاريخ الوصول (${checkIn}) مغلق من الإدارة في ${selectedApartment.name} ولا يمكن حجزه.${blockedInfo?.note ? ' (' + blockedInfo.note + ')' : ''}`
-          : `⛔ غير متاح! تاريخ الوصول (${checkIn}) محجوز مسبقاً في ${selectedApartment.name} (حجز: ${blockedInfo?.bookingNumber || 'غير معروف'}). يُرجى اختيار تاريخ متاح باللون الأخضر.`
+          : `⛔ غير متاح! تاريخ الوصول (${checkIn}) محجوز بالكامل في ${selectedApartment.name}. يُرجى اختيار تاريخ متاح باللون الأخضر.`
       };
     }
+    const partialAvailable = isDateBlocked(checkIn);
     return {
       isSet: true,
       isBlocked: false,
       isPast: false,
-      message: `✓ تاريخ الوصول (${checkIn}) متاح ومؤكد للحجز الفوري.`
+      message: partialAvailable
+        ? `✓ تاريخ الوصول (${checkIn}) متاح (متبقي ${getAvailableUnits(checkIn)} من ${totalUnits} وحدات).`
+        : `✓ تاريخ الوصول (${checkIn}) متاح ومؤكد للحجز الفوري.`
     };
-  }, [checkIn, selectedAptId, selectedApartment.name, isDateBlocked, getBlockedInfo]);
+  }, [checkIn, selectedAptId, selectedApartment.name, getAvailableUnits, getBlockedInfo, isDateBlocked, totalUnits]);
 
   // Status check for Check-Out input (Green if available, Red if invalid or blocked dates in range)
   const checkOutStatus = useMemo(() => {
@@ -339,6 +364,9 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       dateStr: string; 
       dayNum: number; 
       isBlocked: boolean; 
+      isFullyBooked: boolean;
+      availableUnits: number;
+      totalUnits: number;
       blockReason?: 'booking' | 'closed';
       isPast: boolean;
     }[] = [];
@@ -347,6 +375,8 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       const dayFormatted = pad(d);
       const dateStr = `${calendarYear}-${monthFormatted}-${dayFormatted}`;
       const isBlocked = isDateBlocked(dateStr);
+      const isFullyBooked = isDateFullyBooked(dateStr);
+      const availableUnits = getAvailableUnits(dateStr);
       const blockedInfo = isBlocked ? getBlockedInfo(dateStr) : undefined;
       const isPast = dateStr < todayStr;
 
@@ -354,13 +384,16 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         dateStr,
         dayNum: d,
         isBlocked,
+        isFullyBooked,
+        availableUnits,
+        totalUnits,
         blockReason: blockedInfo?.reason,
         isPast
       });
     }
 
     return { firstDayOfWeek, days };
-  }, [calendarYear, calendarMonth, isDateBlocked, getBlockedInfo]);
+  }, [calendarYear, calendarMonth, isDateBlocked, isDateFullyBooked, getAvailableUnits, getBlockedInfo]);
 
   const handleDateClick = (dateStr: string, isBlocked: boolean, isPast: boolean) => {
     if (isPast) {
@@ -547,13 +580,22 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
       if (checkInStatus.isBlocked) {
         showValidationError(checkInStatus.blockReason === 'closed'
           ? 'تاريخ الوصول المحدد مغلق من الإدارة. يُرجى اختيار تاريخ متاح للمتابعة.'
-          : 'تاريخ الوصول المحدد محجوز مسبقاً. يُرجى اختيار تاريخ متاح باللون الأخضر للمتابعة.');
+          : 'تاريخ الوصول المحدد محجوز بالكامل. يُرجى اختيار تاريخ متاح للمتابعة.');
         return;
       }
       if (checkOutStatus.isBlocked) {
         showValidationError(checkOutStatus.blockReason === 'closed'
           ? 'الفترة المختارة تحتوي على أيام مغلقة من الإدارة. يُرجى اختيار فترة متاحة للمتابعة.'
-          : 'الفترة المختارة تحتوي على أيام محجوزة مسبقاً. يُرجى اختيار فترة متاحة للمتابعة.');
+          : 'الفترة المختارة تحتوي على أيام محجوزة بالكامل. يُرجى اختيار فترة متاحة للمتابعة.');
+        return;
+      }
+      
+      // التحقق من توفر الوحدات المطلوبة لفترة الإقامة
+      const availability = getRangeAvailability(checkIn, checkOut);
+      if (availability.minAvailableUnits < apartmentsCount) {
+        showValidationError(
+          `عذراً، لا توجد وحدات كافية لهذه الفترة. متاح ${availability.minAvailableUnits} وحدات فقط، وقد اخترت ${apartmentsCount} وحدة. يُرجى تقليل عدد الوحدات أو اختيار فترة أخرى.`
+        );
         return;
       }
       setStep(2);
@@ -584,6 +626,15 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
         return;
       }
 
+      // التحقق النهائي من توفر الوحدات المطلوبة قبل إنشاء الحجز
+      const availability = getRangeAvailability(checkIn, checkOut);
+      if (availability.minAvailableUnits < apartmentsCount) {
+        showValidationError(
+          `عذراً، لا توجد وحدات كافية لهذه الفترة. متاح ${availability.minAvailableUnits} وحدات فقط، وقد اخترت ${apartmentsCount} وحدة.`
+        );
+        return;
+      }
+      
       // التحقق النهائي من التوفر محلياً (حجوزات + تواريخ محجوبة) قبل إنشاء الحجز
       setCreatingBookingNow(true);
       try {
@@ -593,26 +644,46 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
           where('status', 'in', ['confirmed', 'pending'])
         ));
 
-        const hasLocalConflict = bookingsSnapshot.docs.some(docSnap => {
-          const booking = docSnap.data() as { checkInDate: string; checkOutDate: string };
-          return checkIn < booking.checkOutDate && booking.checkInDate < checkOut;
+        // Calculate booked units per date from real-time bookings
+        const bookedUnitsByDate: Record<string, number> = {};
+        bookingsSnapshot.docs.forEach(docSnap => {
+          const booking = docSnap.data() as { 
+            checkInDate: string; 
+            checkOutDate: string; 
+            apartmentsCount?: number;
+          };
+          if (checkIn < booking.checkOutDate && booking.checkInDate < checkOut) {
+            const units = booking.apartmentsCount || 1;
+            const start = new Date(booking.checkInDate);
+            const end = new Date(booking.checkOutDate);
+            const current = new Date(start);
+            while (current < end) {
+              const dateStr = current.toISOString().split('T')[0];
+              bookedUnitsByDate[dateStr] = (bookedUnitsByDate[dateStr] || 0) + units;
+              current.setDate(current.getDate() + 1);
+            }
+          }
         });
 
-        if (hasLocalConflict) {
-          showValidationError('عذراً، الفترة التي اخترتها محجوزة حالياً. يرجى اختيار تواريخ أخرى.');
-          return;
+        // Check if any date in range has insufficient units
+        let hasInsufficientUnits = false;
+        const start = new Date(checkIn);
+        const end = new Date(checkOut);
+        const current = new Date(start);
+        while (current < end) {
+          const dateStr = current.toISOString().split('T')[0];
+          const bookedUnits = bookedUnitsByDate[dateStr] || 0;
+          const availableUnits = totalUnits - bookedUnits;
+          if (availableUnits < apartmentsCount) {
+            hasInsufficientUnits = true;
+            break;
+          }
+          current.setDate(current.getDate() + 1);
         }
 
-        // Legacy blocked dates collection compatibility
-        const blockedDoc = await getDoc(doc(db, 'blockedDates', selectedApartment.id));
-        if (blockedDoc.exists()) {
-          const blockedData = blockedDoc.data() as { blocked?: string[] };
-          const blockedDates = blockedData.blocked || [];
-          const isSelectedBlocked = blockedDates.some(date => date >= checkIn && date < checkOut);
-          if (isSelectedBlocked) {
-            showValidationError('عذراً، الفترة التي اخترتها محجوزة حالياً. يرجى اختيار تواريخ أخرى.');
-            return;
-          }
+        if (hasInsufficientUnits) {
+          showValidationError('عذراً، الفترة التي اخترتها لا توجد بها وحدات كافية حالياً. يرجى اختيار تواريخ أخرى أو تقليل عدد الوحدات.');
+          return;
         }
 
         const createdBooking = await finalizeBookingNow();
@@ -1098,11 +1169,14 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
 
                     let cellStyle = 'bg-emerald-50/60 border border-emerald-200/80 text-emerald-950 hover:bg-emerald-100 hover:border-emerald-400 font-bold';
                     const isClosedDay = day.isBlocked && day.blockReason === 'closed';
-                    const isBookedDay = day.isBlocked && !isClosedDay;
+                    const isFullyBooked = day.isFullyBooked && !isClosedDay;
+                    const isPartiallyAvailable = day.isBlocked && !day.isFullyBooked && !isClosedDay;
+                    const availableUnits = day.availableUnits;
+                    const totalUnits = day.totalUnits || 2;
                     
                     if (isClosedDay) {
                       cellStyle = 'bg-amber-50/90 border border-amber-400 text-amber-800 hover:bg-amber-100 font-bold';
-                    } else if (isBookedDay) {
+                    } else if (isFullyBooked) {
                       cellStyle = 'bg-red-50/90 border border-red-300 text-red-700 hover:bg-red-100 font-bold';
                     } else if (day.isPast) {
                       cellStyle = 'bg-gray-100/70 border border-gray-200 text-gray-400 cursor-not-allowed opacity-40';
@@ -1116,16 +1190,18 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                       <button
                         key={idx}
                         type="button"
-                        onClick={() => handleDateClick(day.dateStr, day.isBlocked, day.isPast)}
+                        onClick={() => handleDateClick(day.dateStr, (day.isFullyBooked && !isClosedDay) || isClosedDay, day.isPast)}
                         className={`h-12 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer relative p-0.5 ${cellStyle}`}
                         title={
-                          isClosedDay
+                          day.isBlocked && day.blockReason === 'closed'
                             ? `مغلق من الإدارة (${day.dateStr})`
-                            : isBookedDay
-                            ? `محجوز مسبقاً (${day.dateStr})`
+                            : isFullyBooked
+                            ? `محجوز بالكامل (${day.dateStr}) - 0 وحدة متاحة`
                             : day.isPast 
                             ? `تاريخ سابق (${day.dateStr})` 
-                            : `متاح للحجز (${day.dateStr})`
+                            : isPartiallyAvailable
+                            ? `متاح للحجز (${day.dateStr}) - ${availableUnits} من ${totalUnits} وحدات متاحة`
+                            : `متاح للحجز (${day.dateStr}) - ${availableUnits} وحدات متاحة`
                         }
                       >
                         <span className="text-xs sm:text-sm font-mono font-bold leading-none">
@@ -1133,18 +1209,22 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                         </span>
 
                         {/* Visual Indicators */}
-                        {isClosedDay && !isCheckIn && !isCheckOut && (
+                        {day.isBlocked && day.blockReason === 'closed' && !isCheckIn && !isCheckOut && (
                           <span className="text-[9px] font-alexandria font-bold text-amber-700 leading-none mt-1">
                             مغلق
                           </span>
                         )}
-                        {isBookedDay && !isCheckIn && !isCheckOut && (
+                        {isFullyBooked && !isCheckIn && !isCheckOut && (
                           <span className="text-[9px] font-alexandria font-bold text-red-600 leading-none mt-1">
-                            محجوز
+                            محجوز بالكامل
                           </span>
                         )}
 
                         {!day.isBlocked && !day.isPast && !isCheckIn && !isCheckOut && !isInRange && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1"></span>
+                        )}
+
+                        {isPartiallyAvailable && !day.isPast && !isCheckIn && !isCheckOut && !isInRange && (
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1"></span>
                         )}
 
@@ -1168,15 +1248,15 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2 sm:gap-3 pt-3 border-t border-[#C6A16B]/30 text-[11px] text-[#3A2522]">
                   <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 w-full sm:w-auto">
                     <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>
-                    <span className="font-bold text-emerald-900 whitespace-nowrap">أخضر = متاح للحجز</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-300 w-full sm:w-auto">
-                    <span className="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>
-                    <span className="font-bold text-amber-900 whitespace-nowrap">برتقالي = مغلق من الإدارة</span>
+                    <span className="font-bold text-emerald-900 whitespace-nowrap">متاح للحجز</span>
                   </div>
                   <div className="flex items-center gap-1.5 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 w-full sm:w-auto">
                     <span className="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>
-                    <span className="font-bold text-red-900 whitespace-nowrap">أحمر = محجوز مسبقاً</span>
+                    <span className="font-bold text-red-900 whitespace-nowrap">محجوز بالكامل</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-300 w-full sm:w-auto">
+                    <span className="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>
+                    <span className="font-bold text-amber-900 whitespace-nowrap">مغلق من الإدارة</span>
                   </div>
                 </div>
 
@@ -1309,7 +1389,7 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                 </div>
               </div>
 
-              {/* Number of Apartments Selector */}
+              {/* Number of Apartments Selector - Dynamic based on availability */}
               <div className="bg-[#FFF9F1] p-2.5 rounded-lg border-2 border-[#C6A16B]/60 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -1318,36 +1398,63 @@ export const BookingWizard: React.FC<BookingWizardProps> = ({
                     </div>
                     <div>
                       <div className="font-alexandria font-bold text-xs text-[#570A1B]">عدد الشقق</div>
-                      <div className="text-[9px] text-[#3A2522]/70">حد أقصى شقتين</div>
+                      <div className="text-[9px] text-[#3A2522]/70">
+                        {checkIn && checkOut 
+                          ? `متاح: ${getRangeAvailability(checkIn, checkOut).minAvailableUnits} من ${totalUnits} وحدات`
+                          : `حد أقصى ${totalUnits} وحدات`
+                        }
+                      </div>
                     </div>
                   </div>
                   
-                  {/* Increment/Decrement Controls */}
-                  <div className="flex items-center gap-1 bg-white rounded-lg border border-[#C6A16B]/40 p-0.5 shadow-xs">
-                    <button
-                      type="button"
-                      onClick={() => setApartmentsCount(prev => Math.max(1, prev - 1))}
-                      disabled={apartmentsCount <= 1}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-[#570A1B] hover:bg-[#F3E2CC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      aria-label="تقليل عدد الشقق"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
+                  {/* Calculate max available units for the selected range */}
+                  {(() => {
+                    if (!checkIn || !checkOut) return <span className="text-[9px] text-[#3A2522]/70">اختر التواريخ أولاً</span>;
+                    const availability = getRangeAvailability(checkIn, checkOut);
+                    const maxAvailable = Math.min(availability.minAvailableUnits, totalUnits);
                     
-                    <div className="w-10 text-center">
-                      <span className="font-alexandria font-extrabold text-base text-[#570A1B]">{apartmentsCount}</span>
-                    </div>
+                    if (maxAvailable === 0) {
+                      return (
+                        <span className="text-[9px] text-red-600 font-bold">
+                          لا توجد وحدات متاحة لهذه الفترة
+                        </span>
+                      );
+                    }
                     
-                    <button
-                      type="button"
-                      onClick={() => setApartmentsCount(prev => Math.min(2, prev + 1))}
-                      disabled={apartmentsCount >= 2}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-[#570A1B] hover:bg-[#F3E2CC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      aria-label="زيادة عدد الشقق"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
+                    return (
+                      <>
+                        <div className="text-[9px] text-[#3A2522]/70">
+                          متاح {maxAvailable} من {totalUnits} وحدات لهذه الفترة
+                        </div>
+                        {/* Increment/Decrement Controls */}
+                        <div className="flex items-center gap-1 bg-white rounded-lg border border-[#C6A16B]/40 p-0.5 shadow-xs">
+                          <button
+                            type="button"
+                            onClick={() => setApartmentsCount(prev => Math.max(1, prev - 1))}
+                            disabled={apartmentsCount <= 1}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#570A1B] hover:bg-[#F3E2CC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            aria-label="تقليل عدد الشقق"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          
+                          <div className="w-10 text-center">
+                            <span className="font-alexandria font-extrabold text-base text-[#570A1B]">{apartmentsCount}</span>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => setApartmentsCount(prev => Math.min(maxAvailable, prev + 1))}
+                            disabled={apartmentsCount >= maxAvailable}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#570A1B] hover:bg-[#F3E2CC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            aria-label="زيادة عدد الشقق"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

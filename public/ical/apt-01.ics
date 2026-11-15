@@ -2,6 +2,46 @@ BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Roqii//Booking Calendar//AR
 CALSCALE:GREGORIAN
-X-WR-CALNAME:حجوزات الشقة رقم 1
+X-WR-CALNAME:حجوزات رُقِيّ
 X-WR-TIMEZONE:Asia/Riyadh
+BEGIN:VEVENT
+UID:BK-0563D41E@roqii
+DTSTART;VALUE=DATE:20261121
+DTEND;VALUE=DATE:20261122
+SUMMARY:محجوز - حجز Booking.com (رُقِيّ)
+STATUS:CONFIRMED
+DESCRIPTION:حجز رقم BK-0563D41E\nالضيف: حجز Booking.com\nالجوال: من Booking.com\nالمدة: 1 ليالٍ\nالمبلغ: ١٬٤٥٠ ر.س
+END:VEVENT
+BEGIN:VEVENT
+UID:RQ-60983@roqii
+DTSTART;VALUE=DATE:20261115
+DTEND;VALUE=DATE:20261116
+SUMMARY:محجوز - احمد مطر  (رُقِيّ)
+STATUS:CONFIRMED
+DESCRIPTION:حجز رقم RQ-60983\nالضيف: احمد مطر \nالجوال: +966595812059\nالمدة: 1 ليالٍ\nالمبلغ: ٧٠٠ ر.س
+END:VEVENT
+BEGIN:VEVENT
+UID:BK-B23CA168@roqii
+DTSTART;VALUE=DATE:20261118
+DTEND;VALUE=DATE:20261121
+SUMMARY:محجوز - حجز Booking.com (رُقِيّ)
+STATUS:CONFIRMED
+DESCRIPTION:حجز رقم BK-B23CA168\nالضيف: حجز Booking.com\nالجوال: من Booking.com\nالمدة: 3 ليالٍ\nالمبلغ: ٤٬٣٥٠ ر.س
+END:VEVENT
+BEGIN:VEVENT
+UID:BK-5A55D209@roqii
+DTSTART;VALUE=DATE:20261120
+DTEND;VALUE=DATE:20261122
+SUMMARY:محجوز - حجز Booking.com (رُقِيّ)
+STATUS:CONFIRMED
+DESCRIPTION:حجز رقم BK-5A55D209\nالضيف: حجز Booking.com\nالجوال: من Booking.com\nالمدة: 2 ليالٍ\nالمبلغ: ٢٬٩٠٠ ر.س
+END:VEVENT
+BEGIN:VEVENT
+UID:BK-77A6F087@roqii
+DTSTART;VALUE=DATE:20261125
+DTEND;VALUE=DATE:20261126
+SUMMARY:محجوز - حجز Booking.com (رُقِيّ)
+STATUS:CONFIRMED
+DESCRIPTION:حجز رقم BK-77A6F087\nالضيف: حجز Booking.com\nالجوال: من Booking.com\nالمدة: 1 ليالٍ\nالمبلغ: ١٬٤٥٠ ر.س
+END:VEVENT
 END:VCALENDAR

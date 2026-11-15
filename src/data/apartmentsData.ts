@@ -19,6 +19,7 @@ export interface Apartment {
     items: string[];
   }[];
   rules: string[];
+  totalUnits: number; // عدد الوحدات المتاحة (2 للشقة رقية)
 }
 
 export interface Booking {
@@ -45,6 +46,7 @@ export interface Booking {
   paymentStatus?: 'paid' | 'unpaid';
   createdAt: string;
   guestClientId?: string; // Device/client ID for notifications
+  source?: string; // e.g. 'booking.com' for imported reservations
 }
 
 export const APARTMENTS: Apartment[] = [
@@ -127,7 +129,8 @@ export const APARTMENTS: Apartment[] = [
       'التدخين: ممنوع نهائياً داخل الشقة',
       'الهدوء: يُرجى الحفاظ على السكينة بعد الساعة 11:00 مساءً',
       'الحيوانات الأليفة: غير مسموحة'
-    ]
+    ],
+    totalUnits: 2
   }
 ];
 
